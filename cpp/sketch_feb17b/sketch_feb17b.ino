@@ -11,7 +11,7 @@
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
-enum Emotion { NEUTRAL, HAPPY, ANGRY, CONFUSED };
+enum Emotion { NEUTRAL, HAPPY, ANGRY, CONFUSED, SAD, SLEEPING};
 Emotion currentEmotion = NEUTRAL;
 
 int offsetX = 0, offsetY = 0;
@@ -52,7 +52,11 @@ void drawMouth(int xOff, int yOff) {
     // An inverted V/scowl
     display.drawLine(centerX - 10, centerY + 2, centerX, centerY - 3, SSD1306_WHITE);
     display.drawLine(centerX, centerY - 3, centerX + 10, centerY + 2, SSD1306_WHITE);
-  } 
+  } else if (currentEmotion == SAD) {
+    // A downward curve (frown)
+    display.drawRoundRect(centerX - 12, centerY + 2, 24, 10, 5, SSD1306_WHITE);
+    display.fillRect(centerX - 13, centerY + 7, 26, 6, SSD1306_BLACK); // Cut bottom to leave a frown
+  }
   else {
     // Neutral: Just a small flat line
     display.drawLine(centerX - 8, centerY, centerX + 8, centerY, SSD1306_WHITE);
@@ -68,6 +72,9 @@ void drawEye(int x, int y, int w, int h) {
     display.fillRoundRect(x, y, w, h, 8, SSD1306_WHITE);
     if (x < 64) display.fillTriangle(x, y, x+w, y, x+w, y+(h/2), SSD1306_BLACK);
     else display.fillTriangle(x, y, x+w, y, x, y+(h/2), SSD1306_BLACK);
+  } else if (currentEmotion == SAD) {
+  display.fillRoundRect(x, y + 8, w, h - 12, 10, SSD1306_WHITE); 
+    if (x < 64) display.fillRect(x + 5, y + h - 2, 3, 3, SSD1306_WHITE); 
   }
   else {
     display.fillRoundRect(x, y, w, h, 10, SSD1306_WHITE);
@@ -88,6 +95,17 @@ void render() {
   int rightX = 71 + offsetX;
   int yPos = 10 + offsetY; // Eyes positioned higher to leave room for mouth
   
+  if (currentEmotion == SLEEPING) {
+    display.fillRect(leftX, 25 + offsetY, eyeW, 4, SSD1306_WHITE);
+    display.fillRect(rightX, 25 + offsetY, eyeW, 4, SSD1306_WHITE);
+    int zCount = (now / 500) % 3; 
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    if (zCount >= 0) { display.setCursor(105, 20 + bobbing); display.print("z"); }
+    if (zCount >= 1) { display.setCursor(112, 12 + bobbing); display.print("z"); }
+    if (zCount >= 2) { display.setCursor(120, 4 + bobbing); display.print("Z"); }
+    display.drawFastHLine(60 + (offsetX/2), 55, 8, SSD1306_WHITE);
+  } else {
   // Draw Eyes (with Blink logic)
   if (now - lastBlink < 150) {
     display.fillRect(leftX, 25 + offsetY, eyeW, 4, SSD1306_WHITE);
@@ -97,9 +115,6 @@ void render() {
     drawEye(rightX, yPos, eyeW, eyeH);
     if (now - lastBlink > random(3000, 8000)) lastBlink = now;
   }
-
-  // Draw Mouth
-
 
   if (currentEmotion == CONFUSED) {
     // Draw a "?" above the head
@@ -115,7 +130,7 @@ void render() {
   } else {
       drawMouth(offsetX, offsetY);
   }
-
+  }
   display.display();
 }
 
@@ -136,6 +151,12 @@ void loop() {
       currentEmotion = HAPPY;
     } else if (touchCount == 2) {
       currentEmotion = ANGRY;
+    } else if (touchCount == 3) {
+      currentEmotion = SAD;
+      offsetX = 0; offsetY = 10;   // Look down at the floor
+    }
+     else if (touchCount == 4) {
+      currentEmotion = SLEEPING;
     } else {
       currentEmotion = CONFUSED;
       offsetX = 0; offsetY = 5;    // Look down slightly
@@ -145,16 +166,16 @@ void loop() {
     emotionTimer = now;
   }
 
-  if (currentEmotion != NEUTRAL && (now - emotionTimer > 4000)) {
+  if (currentEmotion != NEUTRAL && currentEmotion != SLEEPING && (now - emotionTimer > 4000)) {
     currentEmotion = NEUTRAL;
   }
 
   // Look Around Logic
-  if (now - lastMove > random(2000, 5000)) {
-    offsetX = random(-1, 2) * 10;
-    offsetY = random(-1, 2) * 5;
-    lastMove = now;
-  }
+  if (currentEmotion != SLEEPING && (now - lastMove > random(2000, 5000))) {
+      offsetX = random(-1, 2) * 10;
+      offsetY = random(-1, 2) * 5;
+      lastMove = now;
+    }
 
   render();
 }
